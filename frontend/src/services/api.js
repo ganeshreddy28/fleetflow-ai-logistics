@@ -52,6 +52,7 @@ export const authAPI = {
 // Users API
 export const usersAPI = {
   getAll: (params) => api.get('/users', { params }),
+  getDrivers: () => api.get('/users/drivers'),
   getById: (id) => api.get(`/users/${id}`),
   create: (data) => api.post('/users', data),
   update: (id, data) => api.put(`/users/${id}`, data),

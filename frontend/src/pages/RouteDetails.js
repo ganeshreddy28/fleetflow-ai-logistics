@@ -1,10 +1,11 @@
 /**
- * Route Details Page
+ * Route Details Page with Interactive Map
  */
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { routesAPI, exportAPI } from '../services/api';
+import { routesAPI, exportAPI, usersAPI } from '../services/api';
+import RouteMap from '../components/RouteMap';
 import toast from 'react-hot-toast';
 
 const RouteDetails = () => {
@@ -13,9 +14,13 @@ const RouteDetails = () => {
   const [route, setRoute] = useState(null);
   const [realTimeUpdate, setRealTimeUpdate] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [drivers, setDrivers] = useState([]);
+  const [selectedDriver, setSelectedDriver] = useState('');
+  const [assigning, setAssigning] = useState(false);
 
   useEffect(() => {
     fetchRouteDetails();
+    fetchDrivers();
   }, [id]);
 
   const fetchRouteDetails = async () => {
@@ -23,6 +28,7 @@ const RouteDetails = () => {
       const response = await routesAPI.getById(id);
       setRoute(response.data.data.route);
       setRealTimeUpdate(response.data.data.realTimeUpdate);
+      setSelectedDriver(response.data.data.route?.driver?.id || '');
     } catch (error) {
       toast.error('Failed to load route details');
       navigate('/routes');
@@ -31,29 +37,66 @@ const RouteDetails = () => {
     }
   };
 
+  const fetchDrivers = async () => {
+    try {
+      const response = await usersAPI.getDrivers();
+      setDrivers(response.data.data.drivers || []);
+    } catch (error) {
+      console.log('Could not fetch drivers');
+    }
+  };
+
+  const handleAssignDriver = async () => {
+    if (!selectedDriver) {
+      toast.error('Please select a driver');
+      return;
+    }
+    setAssigning(true);
+    try {
+      const driver = drivers.find(d => d._id === selectedDriver);
+      await routesAPI.update(id, {
+        driver: {
+          id: driver._id,
+          name: driver.name,
+          phone: driver.phone || ''
+        }
+      });
+      toast.success('Driver assigned successfully');
+      fetchRouteDetails();
+    } catch (error) {
+      toast.error('Failed to assign driver');
+    } finally {
+      setAssigning(false);
+    }
+  };
+
   const handleExport = async (format) => {
     try {
       let response;
       let filename;
+      let contentType;
       
       switch (format) {
         case 'pdf':
           response = await exportAPI.routePDF(id);
           filename = `route-${id}.pdf`;
+          contentType = 'application/pdf';
           break;
         case 'csv':
           response = await exportAPI.routeCSV(id);
           filename = `route-${id}.csv`;
+          contentType = 'text/csv';
           break;
         case 'ical':
           response = await exportAPI.routeICal(id);
           filename = `route-${id}.ics`;
+          contentType = 'text/calendar';
           break;
         default:
           return;
       }
 
-      const blob = new Blob([response.data]);
+      const blob = new Blob([response.data], { type: contentType });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -112,15 +155,32 @@ const RouteDetails = () => {
         </div>
       </div>
 
+      {/* Interactive Map */}
+      <div style={styles.mapCard}>
+        <h3 style={styles.cardTitle}>🗺️ Route Map</h3>
+        <RouteMap 
+          deliveries={route.deliveries || []} 
+          startLocation={route.startLocation}
+          height="350px"
+        />
+        <div style={styles.mapLegend}>
+          <span><span style={{...styles.legendDot, backgroundColor: '#10b981'}}></span> Start Location</span>
+          <span><span style={{...styles.legendDot, backgroundColor: '#ef4444'}}></span> Urgent</span>
+          <span><span style={{...styles.legendDot, backgroundColor: '#f59e0b'}}></span> High</span>
+          <span><span style={{...styles.legendDot, backgroundColor: '#1a56db'}}></span> Normal</span>
+          <span><span style={{...styles.legendDot, backgroundColor: '#6b7280'}}></span> Low</span>
+        </div>
+      </div>
+
       <div style={styles.grid}>
         {/* Left Column */}
         <div style={styles.leftCol}>
           {/* Metrics */}
           <div style={styles.card}>
-            <h3 style={styles.cardTitle}>Route Metrics</h3>
+            <h3 style={styles.cardTitle}>📊 Route Metrics</h3>
             <div style={styles.metricsGrid}>
               <div style={styles.metric}>
-                <span style={styles.metricValue}>{route.metrics?.totalStops || 0}</span>
+                <span style={styles.metricValue}>{route.metrics?.totalStops || route.deliveries?.length || 0}</span>
                 <span style={styles.metricLabel}>Stops</span>
               </div>
               <div style={styles.metric}>
@@ -141,7 +201,7 @@ const RouteDetails = () => {
           {/* Real-time Update */}
           {realTimeUpdate && (
             <div style={styles.card}>
-              <h3 style={styles.cardTitle}>Real-time Conditions</h3>
+              <h3 style={styles.cardTitle}>🔴 Real-time Conditions</h3>
               <div style={styles.conditions}>
                 {realTimeUpdate.trafficData && (
                   <div style={styles.condition}>
@@ -186,11 +246,11 @@ const RouteDetails = () => {
             </div>
           )}
 
-          {/* Driver Info */}
-          {route.driver?.name && (
-            <div style={styles.card}>
-              <h3 style={styles.cardTitle}>Driver</h3>
-              <div style={styles.driver}>
+          {/* Driver Assignment */}
+          <div style={styles.card}>
+            <h3 style={styles.cardTitle}>👤 Driver Assignment</h3>
+            {route.driver?.name ? (
+              <div style={styles.driverAssigned}>
                 <div style={styles.driverAvatar}>
                   {route.driver.name[0]}
                 </div>
@@ -198,17 +258,45 @@ const RouteDetails = () => {
                   <p style={styles.driverName}>{route.driver.name}</p>
                   <p style={styles.driverPhone}>{route.driver.phone || 'No phone'}</p>
                 </div>
+                <span style={styles.assignedBadge}>Assigned</span>
               </div>
-            </div>
-          )}
+            ) : (
+              <div style={styles.assignDriver}>
+                <p style={styles.noDriver}>No driver assigned</p>
+                <div style={styles.assignForm}>
+                  <select
+                    value={selectedDriver}
+                    onChange={(e) => setSelectedDriver(e.target.value)}
+                    style={styles.select}
+                  >
+                    <option value="">Select a driver...</option>
+                    {drivers.map(driver => (
+                      <option key={driver._id} value={driver._id}>
+                        {driver.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button 
+                    onClick={handleAssignDriver} 
+                    style={styles.assignBtn}
+                    disabled={assigning}
+                  >
+                    {assigning ? 'Assigning...' : 'Assign'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Vehicle Info */}
           {route.vehicle && (
             <div style={styles.card}>
-              <h3 style={styles.cardTitle}>Vehicle</h3>
-              <p><strong>Type:</strong> {route.vehicle.type}</p>
-              {route.vehicle.licensePlate && <p><strong>Plate:</strong> {route.vehicle.licensePlate}</p>}
-              {route.vehicle.fuelType && <p><strong>Fuel:</strong> {route.vehicle.fuelType}</p>}
+              <h3 style={styles.cardTitle}>🚚 Vehicle</h3>
+              <div style={styles.vehicleInfo}>
+                <p><strong>Type:</strong> {route.vehicle.type}</p>
+                {route.vehicle.licensePlate && <p><strong>Plate:</strong> {route.vehicle.licensePlate}</p>}
+                {route.vehicle.fuelType && <p><strong>Fuel:</strong> {route.vehicle.fuelType}</p>}
+              </div>
             </div>
           )}
         </div>
@@ -216,19 +304,25 @@ const RouteDetails = () => {
         {/* Right Column - Deliveries */}
         <div style={styles.rightCol}>
           <div style={styles.card}>
-            <h3 style={styles.cardTitle}>Delivery Schedule</h3>
+            <h3 style={styles.cardTitle}>📦 Delivery Schedule ({route.deliveries?.length || 0} stops)</h3>
             <div style={styles.deliveryList}>
               {route.deliveries?.length > 0 ? (
                 route.deliveries.map((delivery, index) => (
                   <div key={delivery._id || index} style={styles.deliveryItem}>
-                    <div style={styles.deliveryNum}>{index + 1}</div>
+                    <div style={{
+                      ...styles.deliveryNum,
+                      backgroundColor: delivery.status === 'delivered' ? '#10b981' :
+                                       delivery.status === 'failed' ? '#ef4444' : '#1a56db'
+                    }}>
+                      {delivery.status === 'delivered' ? '✓' :
+                       delivery.status === 'failed' ? '✗' : index + 1}
+                    </div>
                     <div style={styles.deliveryContent}>
                       <p style={styles.deliveryCustomer}>
                         {delivery.customer?.name || 'Customer'}
                       </p>
                       <p style={styles.deliveryAddress}>
-                        {delivery.address?.fullAddress || 
-                         `${delivery.address?.street}, ${delivery.address?.city}`}
+                        {delivery.address?.street}, {delivery.address?.city}
                       </p>
                       <div style={styles.deliveryMeta}>
                         {delivery.timeWindow?.earliest && (
@@ -249,20 +343,21 @@ const RouteDetails = () => {
                         }}>
                           {delivery.priority}
                         </span>
+                        <span style={{
+                          ...styles.statusTag,
+                          backgroundColor: delivery.status === 'delivered' ? '#dcfce7' :
+                                          delivery.status === 'failed' ? '#fef2f2' : '#f1f5f9',
+                          color: delivery.status === 'delivered' ? '#16a34a' :
+                                 delivery.status === 'failed' ? '#dc2626' : '#64748b'
+                        }}>
+                          {delivery.status}
+                        </span>
                       </div>
                       {delivery.trackingNumber && (
                         <p style={styles.tracking}>
-                          Tracking: {delivery.trackingNumber}
+                          📍 {delivery.trackingNumber}
                         </p>
                       )}
-                    </div>
-                    <div style={{
-                      ...styles.deliveryStatus,
-                      color: delivery.status === 'delivered' ? '#10b981' :
-                             delivery.status === 'failed' ? '#ef4444' : '#64748b'
-                    }}>
-                      {delivery.status === 'delivered' ? '✓' :
-                       delivery.status === 'failed' ? '✗' : '○'}
                     </div>
                   </div>
                 ))
@@ -304,6 +399,27 @@ const styles = {
     borderRadius: '6px',
     cursor: 'pointer',
     fontSize: '13px'
+  },
+  mapCard: {
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    padding: '20px',
+    marginBottom: '24px',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+  },
+  mapLegend: {
+    display: 'flex',
+    gap: '20px',
+    marginTop: '12px',
+    fontSize: '12px',
+    color: '#64748b'
+  },
+  legendDot: {
+    display: 'inline-block',
+    width: '12px',
+    height: '12px',
+    borderRadius: '50%',
+    marginRight: '6px'
   },
   grid: {
     display: 'grid',
@@ -350,8 +466,8 @@ const styles = {
   conditions: { display: 'flex', flexDirection: 'column', gap: '12px' },
   condition: { display: 'flex', gap: '12px', alignItems: 'center' },
   conditionIcon: { fontSize: '24px' },
-  conditionLabel: { fontSize: '12px', color: '#64748b' },
-  conditionValue: { fontWeight: '500', textTransform: 'capitalize' },
+  conditionLabel: { fontSize: '12px', color: '#64748b', margin: 0 },
+  conditionValue: { fontWeight: '500', textTransform: 'capitalize', margin: 0 },
   warning: {
     marginTop: '16px',
     padding: '12px',
@@ -360,7 +476,11 @@ const styles = {
     fontSize: '14px',
     color: '#92400e'
   },
-  driver: { display: 'flex', gap: '12px', alignItems: 'center' },
+  driverAssigned: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px'
+  },
   driverAvatar: {
     width: '48px',
     height: '48px',
@@ -373,8 +493,37 @@ const styles = {
     fontSize: '20px',
     fontWeight: 'bold'
   },
-  driverName: { fontWeight: '600' },
-  driverPhone: { fontSize: '14px', color: '#64748b' },
+  driverName: { fontWeight: '600', margin: 0 },
+  driverPhone: { fontSize: '14px', color: '#64748b', margin: 0 },
+  assignedBadge: {
+    marginLeft: 'auto',
+    padding: '4px 10px',
+    backgroundColor: '#dcfce7',
+    color: '#16a34a',
+    borderRadius: '12px',
+    fontSize: '12px',
+    fontWeight: '500'
+  },
+  assignDriver: {},
+  noDriver: { color: '#64748b', marginBottom: '12px' },
+  assignForm: { display: 'flex', gap: '8px' },
+  select: {
+    flex: 1,
+    padding: '10px 12px',
+    borderRadius: '6px',
+    border: '1px solid #d1d5db',
+    fontSize: '14px'
+  },
+  assignBtn: {
+    padding: '10px 20px',
+    backgroundColor: '#1a56db',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontWeight: '500'
+  },
+  vehicleInfo: { lineHeight: '1.8' },
   deliveryList: { display: 'flex', flexDirection: 'column' },
   deliveryItem: {
     display: 'flex',
@@ -398,9 +547,15 @@ const styles = {
   deliveryContent: { flex: 1 },
   deliveryCustomer: { fontWeight: '600', marginBottom: '4px' },
   deliveryAddress: { fontSize: '14px', color: '#64748b', marginBottom: '8px' },
-  deliveryMeta: { display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' },
-  deliveryTime: { fontSize: '13px', color: '#64748b' },
+  deliveryMeta: { display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' },
+  deliveryTime: { fontSize: '12px', color: '#64748b' },
   priorityTag: {
+    fontSize: '11px',
+    padding: '2px 8px',
+    borderRadius: '10px',
+    textTransform: 'capitalize'
+  },
+  statusTag: {
     fontSize: '11px',
     padding: '2px 8px',
     borderRadius: '10px',
@@ -411,10 +566,6 @@ const styles = {
     color: '#64748b',
     fontFamily: 'monospace',
     marginTop: '6px'
-  },
-  deliveryStatus: {
-    fontSize: '20px',
-    fontWeight: 'bold'
   },
   noDeliveries: {
     textAlign: 'center',
