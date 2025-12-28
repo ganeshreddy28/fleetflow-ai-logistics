@@ -1,0 +1,430 @@
+# 🚚 FleetFlow - AI Logistics Route Optimizer
+
+A full-stack platform leveraging generative AI to optimize logistics routes for transportation companies. Built with React, Node.js, MongoDB, and integrates with TomTom Traffic API, Open-Meteo Weather API, and Euron AI for intelligent route optimization.
+
+## 📋 Table of Contents
+
+- [Features](#features)
+- [Architecture](#architecture)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Running the Application](#running-the-application)
+- [API Documentation](#api-documentation)
+- [Testing](#testing)
+- [Folder Structure](#folder-structure)
+
+---
+
+## ✨ Features
+
+- **AI-Powered Route Optimization** - Uses Euron AI (GPT-4.1-nano) for intelligent route sequencing
+- **Real-Time Traffic Data** - TomTom Traffic API integration for live traffic conditions
+- **Weather Integration** - Open-Meteo API for weather-aware routing
+- **Interactive Dashboard** - Analytics and KPIs at a glance
+- **Delivery Management** - Full CRUD for deliveries with time windows, priorities, and tracking
+- **Route Planning** - Create, optimize, and manage delivery routes
+- **Export Options** - PDF, CSV, and iCal export for route schedules
+- **Role-Based Access** - Admin, Dispatcher, and Driver roles
+- **Real-Time Updates** - Automatic route re-optimization based on conditions
+
+---
+
+## 🏗️ Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      FRONTEND                                │
+│                  React + React Router                        │
+│                  Leaflet Maps (future)                       │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    BACKEND API                               │
+│                  Node.js + Express                           │
+│                    JWT Auth                                  │
+└───────┬─────────────┬─────────────┬─────────────┬───────────┘
+        │             │             │             │
+        ▼             ▼             ▼             ▼
+┌───────────┐  ┌───────────┐  ┌───────────┐  ┌───────────┐
+│  Euron    │  │  TomTom   │  │ Open-Meteo│  │  MongoDB  │
+│    AI     │  │  Traffic  │  │  Weather  │  │   Local   │
+│   API     │  │   API     │  │    API    │  │           │
+└───────────┘  └───────────┘  └───────────┘  └───────────┘
+```
+
+---
+
+## 📦 Prerequisites
+
+Before you begin, ensure you have the following installed:
+
+- **Node.js** v18+ ([Download](https://nodejs.org/))
+- **MongoDB** v6+ ([Download](https://www.mongodb.com/try/download/community))
+- **npm** or **yarn**
+- **VS Code** (recommended)
+
+---
+
+## 🛠️ Installation
+
+### Step 1: Clone/Navigate to the Project
+
+```bash
+cd fleetflow
+```
+
+### Step 2: Install Backend Dependencies
+
+```bash
+cd backend
+npm install
+```
+
+### Step 3: Install Frontend Dependencies
+
+```bash
+cd ../frontend
+npm install
+```
+
+---
+
+## ⚙️ Configuration
+
+### Backend Configuration
+
+The backend `.env` file is located at `/backend/.env`. Update the following:
+
+```env
+# ===========================================
+# FleetFlow Backend Environment Configuration
+# ===========================================
+
+# Server Configuration
+PORT=5000
+NODE_ENV=development
+
+# MongoDB Configuration (Local)
+MONGODB_URI=mongodb://localhost:27017/fleetflow
+
+# JWT Configuration
+JWT_SECRET=fleetflow_jwt_secret_key_change_in_production_2024
+JWT_EXPIRE=7d
+
+# API Keys
+# TomTom API Key - Already configured
+TOMTOM_API_KEY=ryo82mHepbVWbZhbsN7VjpUFlBAaH3r6
+
+# Euron AI API Key - ⚠️ REPLACE THIS WITH YOUR KEY
+EURON_API_KEY=YOUR_EURON_API_KEY_HERE    # <-- REPLACE THIS!
+EURON_API_URL=https://api.euron.one/api/v1/euri/chat/completions
+
+# Open-Meteo Weather API (Free - No Key Required)
+OPENMETEO_API_URL=https://api.open-meteo.com/v1/forecast
+```
+
+### 🔑 Where to Replace API Keys
+
+| API | File Location | Line to Update |
+|-----|---------------|----------------|
+| **Euron AI** | `/backend/.env` | `EURON_API_KEY=YOUR_EURON_API_KEY_HERE` |
+| **TomTom** | `/backend/.env` | Already configured: `ryo82mHepbVWbZhbsN7VjpUFlBAaH3r6` |
+
+---
+
+## 🚀 Running the Application
+
+### Step 1: Start MongoDB
+
+**Option A: If MongoDB is installed locally:**
+```bash
+# Windows
+mongod
+
+# macOS (with Homebrew)
+brew services start mongodb-community
+
+# Linux
+sudo systemctl start mongod
+```
+
+**Option B: Using Docker:**
+```bash
+docker run -d -p 27017:27017 --name fleetflow-mongo mongo:latest
+```
+
+### Step 2: Start the Backend Server
+
+Open a terminal in VS Code (`Ctrl+`` or `Cmd+``):
+
+```bash
+cd backend
+npm run dev
+```
+
+You should see:
+```
+╔═══════════════════════════════════════════════════════════╗
+║                                                           ║
+║   FleetFlow - AI Logistics Route Optimizer                ║
+║   Server running on port 5000                             ║
+║   Environment: development                                ║
+║                                                           ║
+╚═══════════════════════════════════════════════════════════╝
+```
+
+### Step 3: Start the Frontend
+
+Open a **new terminal** in VS Code:
+
+```bash
+cd frontend
+npm start
+```
+
+The frontend will open at: **http://localhost:3000**
+
+---
+
+## 📖 API Documentation
+
+### Base URL
+```
+http://localhost:5000/api
+```
+
+### Authentication Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/auth/register` | Register new user |
+| POST | `/auth/login` | Login user |
+| GET | `/auth/me` | Get current user |
+| PUT | `/auth/updatedetails` | Update profile |
+| PUT | `/auth/updatepassword` | Update password |
+
+### Deliveries Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/deliveries` | Get all deliveries |
+| POST | `/deliveries` | Create delivery |
+| GET | `/deliveries/:id` | Get delivery by ID |
+| PUT | `/deliveries/:id` | Update delivery |
+| DELETE | `/deliveries/:id` | Delete delivery |
+| GET | `/deliveries/track/:trackingNumber` | Track delivery (public) |
+| POST | `/deliveries/:id/deliver` | Mark as delivered |
+| POST | `/deliveries/:id/fail` | Mark as failed |
+
+### Routes Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/routes` | Get all routes |
+| POST | `/routes` | Create route |
+| POST | `/routes/optimize` | **AI Route Optimization** |
+| GET | `/routes/:id` | Get route by ID |
+| PUT | `/routes/:id` | Update route |
+| DELETE | `/routes/:id` | Delete route |
+| POST | `/routes/:id/start` | Start route |
+| POST | `/routes/:id/complete` | Complete route |
+
+### Export Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/export/routes/:id/pdf` | Export route as PDF |
+| GET | `/export/routes/:id/csv` | Export route as CSV |
+| GET | `/export/routes/:id/ical` | Export route as iCal |
+
+---
+
+## 🧪 Testing
+
+### Run Backend Tests
+
+```bash
+cd backend
+npm test
+```
+
+### Test API with cURL
+
+**Register a User:**
+```bash
+curl -X POST http://localhost:5000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Test User",
+    "email": "test@fleetflow.com",
+    "password": "test123",
+    "companyId": "TESTCO",
+    "role": "admin"
+  }'
+```
+
+**Login:**
+```bash
+curl -X POST http://localhost:5000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "test@fleetflow.com",
+    "password": "test123"
+  }'
+```
+
+**Create a Delivery (with token):**
+```bash
+curl -X POST http://localhost:5000/api/deliveries \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  -d '{
+    "address": {
+      "street": "123 Main St",
+      "city": "San Francisco",
+      "state": "CA",
+      "postalCode": "94102"
+    },
+    "location": {
+      "coordinates": [-122.4194, 37.7749]
+    },
+    "timeWindow": {
+      "earliest": "2025-01-15T09:00:00Z",
+      "latest": "2025-01-15T12:00:00Z"
+    },
+    "customer": {
+      "name": "John Doe",
+      "phone": "555-1234"
+    },
+    "priority": "normal"
+  }'
+```
+
+**Optimize Route (AI):**
+```bash
+curl -X POST http://localhost:5000/api/routes/optimize \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  -d '{
+    "deliveryIds": ["DELIVERY_ID_1", "DELIVERY_ID_2"],
+    "startLocation": {
+      "coordinates": [-122.4194, 37.7749]
+    },
+    "vehicleType": "van",
+    "optimizationPriority": "balanced"
+  }'
+```
+
+---
+
+## 📁 Folder Structure
+
+```
+fleetflow/
+├── backend/
+│   ├── src/
+│   │   ├── controllers/      # Request handlers
+│   │   │   ├── auth.controller.js
+│   │   │   ├── delivery.controller.js
+│   │   │   ├── route.controller.js
+│   │   │   ├── user.controller.js
+│   │   │   ├── analytics.controller.js
+│   │   │   └── export.controller.js
+│   │   ├── models/           # MongoDB schemas
+│   │   │   ├── User.model.js
+│   │   │   ├── RoutePlan.model.js
+│   │   │   ├── Delivery.model.js
+│   │   │   └── RealTimeUpdate.model.js
+│   │   ├── routes/           # API routes
+│   │   ├── services/         # Business logic
+│   │   │   ├── aiRoute.service.js      # Euron AI integration
+│   │   │   ├── tomtom.service.js       # Traffic data
+│   │   │   ├── weather.service.js      # Weather data
+│   │   │   ├── realTimeUpdate.service.js
+│   │   │   └── export.service.js       # PDF/CSV/iCal
+│   │   ├── middleware/       # Auth, validation, errors
+│   │   ├── utils/            # Logger, helpers
+│   │   └── server.js         # Entry point
+│   ├── tests/                # Jest tests
+│   ├── logs/                 # Application logs
+│   ├── .env                  # Environment variables
+│   └── package.json
+│
+├── frontend/
+│   ├── public/
+│   │   └── index.html
+│   ├── src/
+│   │   ├── components/       # Reusable components
+│   │   │   └── Layout.js
+│   │   ├── pages/            # Page components
+│   │   │   ├── Login.js
+│   │   │   ├── Register.js
+│   │   │   ├── Dashboard.js
+│   │   │   ├── Deliveries.js
+│   │   │   ├── RoutesList.js
+│   │   │   ├── RouteOptimizer.js
+│   │   │   └── RouteDetails.js
+│   │   ├── context/          # React context
+│   │   │   └── AuthContext.js
+│   │   ├── services/         # API service
+│   │   │   └── api.js
+│   │   ├── App.js
+│   │   └── index.js
+│   └── package.json
+│
+└── README.md
+```
+
+---
+
+## 🎯 Quick Start Commands (VS Code)
+
+```bash
+# Terminal 1 - Start MongoDB (if using Docker)
+docker run -d -p 27017:27017 --name fleetflow-mongo mongo:latest
+
+# Terminal 2 - Start Backend
+cd backend && npm install && npm run dev
+
+# Terminal 3 - Start Frontend
+cd frontend && npm install && npm start
+```
+
+---
+
+## 🔧 Troubleshooting
+
+### MongoDB Connection Error
+- Ensure MongoDB is running: `mongod` or check Docker container
+- Verify connection string in `.env`
+
+### API Key Errors
+- Ensure `EURON_API_KEY` is replaced in `/backend/.env`
+- TomTom key is already configured
+
+### Port Already in Use
+```bash
+# Kill process on port 5000 (backend)
+npx kill-port 5000
+
+# Kill process on port 3000 (frontend)
+npx kill-port 3000
+```
+
+---
+
+## 📝 License
+
+MIT License - See LICENSE file for details.
+
+---
+
+## 🤝 Support
+
+For issues or questions, please create an issue in the repository.
+
+---
+
+**Built with ❤️ by FleetFlow Team**
