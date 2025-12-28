@@ -103,7 +103,7 @@ The backend `.env` file is located at `/backend/.env`. Update the following:
 # ===========================================
 
 # Server Configuration
-PORT=5000
+PORT=5001
 NODE_ENV=development
 
 # MongoDB Configuration (Local)
@@ -113,32 +113,11 @@ MONGODB_URI=mongodb://localhost:27017/fleetflow
 JWT_SECRET=fleetflow_jwt_secret_key_change_in_production_2024
 JWT_EXPIRE=7d
 
-# API Keys
-# TomTom API Key - Already configured
-TOMTOM_API_KEY=ryo82mHepbVWbZhbsN7VjpUFlBAaH3r6
-
-# Euron AI API Key - ⚠️ REPLACE THIS WITH YOUR KEY
-EURON_API_KEY=YOUR_EURON_API_KEY_HERE    # <-- REPLACE THIS!
-EURON_API_URL=https://api.euron.one/api/v1/euri/chat/completions
-
-# Open-Meteo Weather API (Free - No Key Required)
-OPENMETEO_API_URL=https://api.open-meteo.com/v1/forecast
 ```
-
-### 🔑 Where to Replace API Keys
-
-| API | File Location | Line to Update |
-|-----|---------------|----------------|
-| **Euron AI** | `/backend/.env` | `EURON_API_KEY=YOUR_EURON_API_KEY_HERE` |
-| **TomTom** | `/backend/.env` | Already configured: `ryo82mHepbVWbZhbsN7VjpUFlBAaH3r6` |
-
----
 
 ## 🚀 Running the Application
 
-### Step 1: Start MongoDB
-
-**Option A: If MongoDB is installed locally:**
+### Start MongoDB
 ```bash
 # Windows
 mongod
@@ -148,11 +127,6 @@ brew services start mongodb-community
 
 # Linux
 sudo systemctl start mongod
-```
-
-**Option B: Using Docker:**
-```bash
-docker run -d -p 27017:27017 --name fleetflow-mongo mongo:latest
 ```
 
 ### Step 2: Start the Backend Server
@@ -192,7 +166,7 @@ The frontend will open at: **http://localhost:3000**
 
 ### Base URL
 ```
-http://localhost:5000/api
+http://localhost:5001/api
 ```
 
 ### Authentication Endpoints
@@ -250,74 +224,6 @@ cd backend
 npm test
 ```
 
-### Test API with cURL
-
-**Register a User:**
-```bash
-curl -X POST http://localhost:5000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Test User",
-    "email": "test@fleetflow.com",
-    "password": "test123",
-    "companyId": "TESTCO",
-    "role": "admin"
-  }'
-```
-
-**Login:**
-```bash
-curl -X POST http://localhost:5000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "test@fleetflow.com",
-    "password": "test123"
-  }'
-```
-
-**Create a Delivery (with token):**
-```bash
-curl -X POST http://localhost:5000/api/deliveries \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
-  -d '{
-    "address": {
-      "street": "123 Main St",
-      "city": "San Francisco",
-      "state": "CA",
-      "postalCode": "94102"
-    },
-    "location": {
-      "coordinates": [-122.4194, 37.7749]
-    },
-    "timeWindow": {
-      "earliest": "2025-01-15T09:00:00Z",
-      "latest": "2025-01-15T12:00:00Z"
-    },
-    "customer": {
-      "name": "John Doe",
-      "phone": "555-1234"
-    },
-    "priority": "normal"
-  }'
-```
-
-**Optimize Route (AI):**
-```bash
-curl -X POST http://localhost:5000/api/routes/optimize \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
-  -d '{
-    "deliveryIds": ["DELIVERY_ID_1", "DELIVERY_ID_2"],
-    "startLocation": {
-      "coordinates": [-122.4194, 37.7749]
-    },
-    "vehicleType": "van",
-    "optimizationPriority": "balanced"
-  }'
-```
-
----
 
 ## 📁 Folder Structure
 
@@ -339,7 +245,7 @@ fleetflow/
 │   │   │   └── RealTimeUpdate.model.js
 │   │   ├── routes/           # API routes
 │   │   ├── services/         # Business logic
-│   │   │   ├── aiRoute.service.js      # Euron AI integration
+│   │   │   ├── aiRoute.service.js      
 │   │   │   ├── tomtom.service.js       # Traffic data
 │   │   │   ├── weather.service.js      # Weather data
 │   │   │   ├── realTimeUpdate.service.js
@@ -379,41 +285,6 @@ fleetflow/
 
 ---
 
-## 🎯 Quick Start Commands (VS Code)
-
-```bash
-# Terminal 1 - Start MongoDB (if using Docker)
-docker run -d -p 27017:27017 --name fleetflow-mongo mongo:latest
-
-# Terminal 2 - Start Backend
-cd backend && npm install && npm run dev
-
-# Terminal 3 - Start Frontend
-cd frontend && npm install && npm start
-```
-
----
-
-## 🔧 Troubleshooting
-
-### MongoDB Connection Error
-- Ensure MongoDB is running: `mongod` or check Docker container
-- Verify connection string in `.env`
-
-### API Key Errors
-- Ensure `EURON_API_KEY` is replaced in `/backend/.env`
-- TomTom key is already configured
-
-### Port Already in Use
-```bash
-# Kill process on port 5000 (backend)
-npx kill-port 5000
-
-# Kill process on port 3000 (frontend)
-npx kill-port 3000
-```
-
----
 
 ## 📝 License
 
@@ -427,4 +298,4 @@ For issues or questions, please create an issue in the repository.
 
 ---
 
-**Built with ❤️ by FleetFlow Team**
+**Built with ❤️ by Sai Ganesh Kolan**
