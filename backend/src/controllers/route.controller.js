@@ -3,7 +3,7 @@
  * Handles route plan CRUD and optimization
  */
 
-const { RoutePlan, Delivery, RealTimeUpdate } = require('../models');
+const { RoutePlan, Delivery, RealTimeUpdate, User } = require('../models');
 const { asyncHandler, ApiError } = require('../middleware/errorHandler');
 const AIRouteService = require('../services/aiRoute.service');
 const TomTomService = require('../services/tomtom.service');
@@ -139,7 +139,6 @@ const createRoute = asyncHandler(async (req, res) => {
   // Get driver info if provided
   let driver = null;
   if (driverId) {
-    const { User } = require('../models');
     const driverUser = await User.findById(driverId);
     if (driverUser) {
       driver = {
@@ -278,33 +277,51 @@ const updateRoute = asyncHandler(async (req, res) => {
     throw new ApiError('Route not found', 404);
   }
 
-  if (route.companyId !== req.user.companyId) {
-    throw new ApiError('Not authorized', 403);
+  // Check ownership (allow admin and dispatcher to update)
+  if (route.userId.toString() !== req.user.id && 
+      req.user.role !== 'admin' && 
+      req.user.role !== 'dispatcher') {
+    throw new ApiError('Not authorized to update this route', 403);
   }
 
-  // Fields that can be updated
-  const allowedUpdates = [
-    'name', 'description', 'deliveries', 'route', 'routeGeometry',
-    'scheduledDate', 'startTime', 'endTime', 'status', 'vehicle',
-    'driver', 'optimizationSettings', 'tags', 'notes', 'metrics', 'cost'
-  ];
+  // Handle delivery reordering
+  if (req.body.deliveryIds && req.body.deliveryIds.length > 0) {
+    const deliveries = await Delivery.find({ _id: { $in: req.body.deliveryIds } });
+    
+    // Reorder deliveries based on the new sequence
+    const orderedDeliveryIds = req.body.deliveryIds.map(id => {
+      const delivery = deliveries.find(d => d._id.toString() === id);
+      return delivery ? delivery._id : null;
+    }).filter(Boolean);
+    
+    route.deliveries = orderedDeliveryIds;
+    
+    logger.info(`Route ${route._id} reordered with ${orderedDeliveryIds.length} deliveries`);
+  }
 
-  const updates = {};
+  // Update driver assignment
+  if (req.body.driver) {
+    route.driver = req.body.driver;
+    logger.info(`Driver assigned to route ${route._id}: ${req.body.driver.name}`);
+  }
+
+  // Update other allowed fields
+  const allowedUpdates = ['name', 'status', 'vehicle', 'scheduledDate', 'description', 'notes'];
   allowedUpdates.forEach(field => {
     if (req.body[field] !== undefined) {
-      updates[field] = req.body[field];
+      route[field] = req.body[field];
     }
   });
 
-  route = await RoutePlan.findByIdAndUpdate(req.params.id, updates, {
-    new: true,
-    runValidators: true
-  }).populate('deliveries');
+  await route.save();
+
+  // Populate deliveries for response
+  const populatedRoute = await RoutePlan.findById(route._id).populate('deliveries');
 
   res.status(200).json({
     success: true,
     message: 'Route updated successfully',
-    data: { route }
+    data: { route: populatedRoute }
   });
 });
 
@@ -367,6 +384,8 @@ const startRoute = asyncHandler(async (req, res) => {
     { status: 'in_transit' }
   );
 
+  logger.info(`Route ${route._id} started by user ${req.user.id}`);
+
   res.status(200).json({
     success: true,
     message: 'Route started',
@@ -399,6 +418,8 @@ const completeRoute = asyncHandler(async (req, res) => {
     { routePlanId: route._id },
     { status: 'delivered', actualArrival: new Date() }
   );
+
+  logger.info(`Route ${route._id} completed by user ${req.user.id}`);
 
   res.status(200).json({
     success: true,
@@ -496,6 +517,8 @@ const getRouteUpdates = asyncHandler(async (req, res) => {
  */
 const reoptimizeRoute = asyncHandler(async (req, res) => {
   const result = await RealTimeUpdateService.triggerReoptimization(req.params.id);
+
+  logger.info(`Route ${req.params.id} re-optimization triggered by user ${req.user.id}`);
 
   res.status(200).json({
     success: true,

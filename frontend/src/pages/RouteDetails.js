@@ -1,11 +1,12 @@
 /**
- * Route Details Page with Interactive Map
+ * Route Details Page with Interactive Map and Drag-and-Drop
  */
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { routesAPI, exportAPI, usersAPI } from '../services/api';
 import RouteMap from '../components/RouteMap';
+import DraggableDeliveryList from '../components/DraggableDeliveryList';
 import toast from 'react-hot-toast';
 
 const RouteDetails = () => {
@@ -17,6 +18,9 @@ const RouteDetails = () => {
   const [drivers, setDrivers] = useState([]);
   const [selectedDriver, setSelectedDriver] = useState('');
   const [assigning, setAssigning] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [reorderedDeliveries, setReorderedDeliveries] = useState([]);
+  const [savingOrder, setSavingOrder] = useState(false);
 
   useEffect(() => {
     fetchRouteDetails();
@@ -67,6 +71,21 @@ const RouteDetails = () => {
       toast.error('Failed to assign driver');
     } finally {
       setAssigning(false);
+    }
+  };
+
+  const handleSaveOrder = async (newOrder) => {
+    setSavingOrder(true);
+    try {
+      const deliveryIds = newOrder.map(d => d._id);
+      await routesAPI.update(id, { deliveryIds });
+      toast.success('Route order updated successfully');
+      setEditMode(false);
+      fetchRouteDetails();
+    } catch (error) {
+      toast.error('Failed to update route order');
+    } finally {
+      setSavingOrder(false);
     }
   };
 
@@ -303,69 +322,88 @@ const RouteDetails = () => {
 
         {/* Right Column - Deliveries */}
         <div style={styles.rightCol}>
-          <div style={styles.card}>
-            <h3 style={styles.cardTitle}>📦 Delivery Schedule ({route.deliveries?.length || 0} stops)</h3>
-            <div style={styles.deliveryList}>
-              {route.deliveries?.length > 0 ? (
-                route.deliveries.map((delivery, index) => (
-                  <div key={delivery._id || index} style={styles.deliveryItem}>
-                    <div style={{
-                      ...styles.deliveryNum,
-                      backgroundColor: delivery.status === 'delivered' ? '#10b981' :
-                                       delivery.status === 'failed' ? '#ef4444' : '#1a56db'
-                    }}>
-                      {delivery.status === 'delivered' ? '✓' :
-                       delivery.status === 'failed' ? '✗' : index + 1}
-                    </div>
-                    <div style={styles.deliveryContent}>
-                      <p style={styles.deliveryCustomer}>
-                        {delivery.customer?.name || 'Customer'}
-                      </p>
-                      <p style={styles.deliveryAddress}>
-                        {delivery.address?.street}, {delivery.address?.city}
-                      </p>
-                      <div style={styles.deliveryMeta}>
-                        {delivery.timeWindow?.earliest && (
-                          <span style={styles.deliveryTime}>
-                            🕐 {new Date(delivery.timeWindow.earliest).toLocaleTimeString([], 
-                              {hour: '2-digit', minute:'2-digit'})}
-                            {' - '}
-                            {new Date(delivery.timeWindow.latest).toLocaleTimeString([], 
-                              {hour: '2-digit', minute:'2-digit'})}
-                          </span>
-                        )}
-                        <span style={{
-                          ...styles.priorityTag,
-                          backgroundColor: delivery.priority === 'urgent' ? '#fef2f2' :
-                                          delivery.priority === 'high' ? '#fef3c7' : '#f1f5f9',
-                          color: delivery.priority === 'urgent' ? '#dc2626' :
-                                 delivery.priority === 'high' ? '#d97706' : '#64748b'
-                        }}>
-                          {delivery.priority}
-                        </span>
-                        <span style={{
-                          ...styles.statusTag,
-                          backgroundColor: delivery.status === 'delivered' ? '#dcfce7' :
-                                          delivery.status === 'failed' ? '#fef2f2' : '#f1f5f9',
-                          color: delivery.status === 'delivered' ? '#16a34a' :
-                                 delivery.status === 'failed' ? '#dc2626' : '#64748b'
-                        }}>
-                          {delivery.status}
-                        </span>
-                      </div>
-                      {delivery.trackingNumber && (
-                        <p style={styles.tracking}>
-                          📍 {delivery.trackingNumber}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p style={styles.noDeliveries}>No deliveries assigned</p>
-              )}
-            </div>
+          {/* Edit Mode Toggle */}
+          <div style={styles.editToggle}>
+            <button 
+              onClick={() => setEditMode(!editMode)} 
+              style={editMode ? styles.editBtnActive : styles.editBtn}
+            >
+              {editMode ? '📋 View Mode' : '✏️ Edit Order'}
+            </button>
           </div>
+
+          {editMode ? (
+            <DraggableDeliveryList
+              deliveries={route.deliveries || []}
+              onReorder={setReorderedDeliveries}
+              onSave={handleSaveOrder}
+              saving={savingOrder}
+            />
+          ) : (
+            <div style={styles.card}>
+              <h3 style={styles.cardTitle}>📦 Delivery Schedule ({route.deliveries?.length || 0} stops)</h3>
+              <div style={styles.deliveryList}>
+                {route.deliveries?.length > 0 ? (
+                  route.deliveries.map((delivery, index) => (
+                    <div key={delivery._id || index} style={styles.deliveryItem}>
+                      <div style={{
+                        ...styles.deliveryNum,
+                        backgroundColor: delivery.status === 'delivered' ? '#10b981' :
+                                         delivery.status === 'failed' ? '#ef4444' : '#1a56db'
+                      }}>
+                        {delivery.status === 'delivered' ? '✓' :
+                         delivery.status === 'failed' ? '✗' : index + 1}
+                      </div>
+                      <div style={styles.deliveryContent}>
+                        <p style={styles.deliveryCustomer}>
+                          {delivery.customer?.name || 'Customer'}
+                        </p>
+                        <p style={styles.deliveryAddress}>
+                          {delivery.address?.street}, {delivery.address?.city}
+                        </p>
+                        <div style={styles.deliveryMeta}>
+                          {delivery.timeWindow?.earliest && (
+                            <span style={styles.deliveryTime}>
+                              🕐 {new Date(delivery.timeWindow.earliest).toLocaleTimeString([], 
+                                {hour: '2-digit', minute:'2-digit'})}
+                              {' - '}
+                              {new Date(delivery.timeWindow.latest).toLocaleTimeString([], 
+                                {hour: '2-digit', minute:'2-digit'})}
+                            </span>
+                          )}
+                          <span style={{
+                            ...styles.priorityTag,
+                            backgroundColor: delivery.priority === 'urgent' ? '#fef2f2' :
+                                            delivery.priority === 'high' ? '#fef3c7' : '#f1f5f9',
+                            color: delivery.priority === 'urgent' ? '#dc2626' :
+                                   delivery.priority === 'high' ? '#d97706' : '#64748b'
+                          }}>
+                            {delivery.priority}
+                          </span>
+                          <span style={{
+                            ...styles.statusTag,
+                            backgroundColor: delivery.status === 'delivered' ? '#dcfce7' :
+                                            delivery.status === 'failed' ? '#fef2f2' : '#f1f5f9',
+                            color: delivery.status === 'delivered' ? '#16a34a' :
+                                   delivery.status === 'failed' ? '#dc2626' : '#64748b'
+                          }}>
+                            {delivery.status}
+                          </span>
+                        </div>
+                        {delivery.trackingNumber && (
+                          <p style={styles.tracking}>
+                            📍 {delivery.trackingNumber}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p style={styles.noDeliveries}>No deliveries assigned</p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -524,6 +562,29 @@ const styles = {
     fontWeight: '500'
   },
   vehicleInfo: { lineHeight: '1.8' },
+  editToggle: {
+    marginBottom: '16px',
+    textAlign: 'right'
+  },
+  editBtn: {
+    padding: '10px 20px',
+    backgroundColor: '#f1f5f9',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500'
+  },
+  editBtnActive: {
+    padding: '10px 20px',
+    backgroundColor: '#1a56db',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500'
+  },
   deliveryList: { display: 'flex', flexDirection: 'column' },
   deliveryItem: {
     display: 'flex',

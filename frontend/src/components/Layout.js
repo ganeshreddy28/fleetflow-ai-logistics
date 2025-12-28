@@ -5,6 +5,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import Notifications from './Notifications';
 
 const Layout = ({ children }) => {
   const { user, logout } = useAuth();
@@ -84,6 +85,7 @@ const Layout = ({ children }) => {
             {navItems.find(i => i.path === location.pathname)?.label || 'FleetFlow'}
           </h1>
           <div style={styles.headerRight}>
+            <Notifications />
             <span style={styles.companyId}>{user?.companyId}</span>
           </div>
         </header>
